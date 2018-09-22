@@ -71,8 +71,7 @@ public class ByteBufferTCPSampler extends AbstractJavaSamplerClient implements T
             client.read(rBuffer);
 
             if(defaultPacket) {
-                StringBuilder builder = makeDefaultResponse(result);
-                result.setResponseMessage(builder.toString());
+                makeDefaultResponse(result);
             } else {
                 result.sampleEnd();
                 result.setSuccessful(true);
@@ -84,32 +83,23 @@ public class ByteBufferTCPSampler extends AbstractJavaSamplerClient implements T
             result.sampleEnd();
             result.setResponseMessage(e.getMessage());
             result.setSuccessful(false);
-        }
+        } finally {
+            if(client != null)
+                client.close();
 
+            client = new Client();
+        }
         return result;
     }
 
-    private StringBuilder makeDefaultResponse(SampleResult result) {
+    private void makeDefaultResponse(SampleResult result) {
         rBuffer.flip();
         long send = rBuffer.getLong();
         long received = rBuffer.getLong();
         result.sampleEnd();
         result.setSuccessful(true);
         result.setResponseCodeOK();
-        StringBuilder builder = new StringBuilder();
-        builder.append("Initial Time: ");
-        builder.append(Instant.ofEpochMilli(send).atZone(ZoneId.systemDefault()));
-        builder.append("\n");
-        builder.append("Server Received Time: ");
-        builder.append(Instant.ofEpochMilli(received).atZone(ZoneId.systemDefault()));
-        builder.append("\n");
-        builder.append("Send Time: " );
-        builder.append(received - send);
-        builder.append("\n");
-        builder.append("Round Trip Time: ");
-        builder.append(result.getEndTime() - send);
-        builder.append("\n");
-        return builder;
+        result.setResponseMessage((result.getEndTime() - result.getStartTime()) + " ms ");
     }
 
     private ByteBuffer getReadBuffer(JavaSamplerContext javaSamplerContext) {
@@ -165,7 +155,7 @@ public class ByteBufferTCPSampler extends AbstractJavaSamplerClient implements T
         sampleBuffer = buffer;
     }
 
-    public ByteBuffer getSampleBuffer() {
+    private ByteBuffer getSampleBuffer() {
         return sampleBuffer;
     }
 

@@ -5,27 +5,27 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 
-public class Client {
+class Client {
 
     private SocketChannel socket;
 
-    public void connect(String server, int port) throws IOException {
+    void connect(String server, int port) throws IOException {
         socket = SocketChannel.open(new InetSocketAddress(server, port));
     }
 
-    public void send(ByteBuffer buffer) throws IOException {
+    void send(ByteBuffer buffer) throws IOException {
         socket.write(buffer);
     }
 
 
-    public void read(ByteBuffer byteBuffer) throws IOException {
+    void read(ByteBuffer byteBuffer) throws IOException {
         socket.read(byteBuffer);
     }
 
-    public void close() {
+    void close() {
         try {
             socket.close();
-        } catch (IOException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
