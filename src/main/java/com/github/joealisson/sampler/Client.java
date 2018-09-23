@@ -11,6 +11,7 @@ class Client {
 
     void connect(String server, int port) throws IOException {
         socket = SocketChannel.open(new InetSocketAddress(server, port));
+        socket.socket().setSoTimeout(1000);
     }
 
     void send(ByteBuffer buffer) throws IOException {
@@ -24,7 +25,9 @@ class Client {
 
     void close() {
         try {
-            socket.close();
+            if(socket != null) {
+                socket.close();
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }

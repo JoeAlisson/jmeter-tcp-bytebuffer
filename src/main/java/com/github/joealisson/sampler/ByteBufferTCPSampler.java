@@ -54,17 +54,17 @@ public class ByteBufferTCPSampler extends AbstractJavaSamplerClient implements T
         String server = javaSamplerContext.getParameter(SERVER);
         int port = javaSamplerContext.getIntParameter(PORT);
 
-        if(isNull(sampleBuffer)) {
-
-            createSampleBuffer(javaSamplerContext);
-            putDefaultPacketOnBuffer();
-        }
+        SampleResult result = new SampleResult();
 
         rBuffer = getReadBuffer(javaSamplerContext);
 
-        SampleResult result = new SampleResult();
-        result.sampleStart();
+        if(isNull(sampleBuffer)) {
 
+            createSampleBuffer(javaSamplerContext);
+            putDefaultPacketOnBuffer(javaSamplerContext);
+        }
+
+        result.sampleStart();
         try {
             client.connect(server, port);
             client.send(getSampleBuffer());
@@ -84,9 +84,9 @@ public class ByteBufferTCPSampler extends AbstractJavaSamplerClient implements T
             result.setResponseMessage(e.getMessage());
             result.setSuccessful(false);
         } finally {
-            if(client != null)
+            if(client != null) {
                 client.close();
-
+            }
             client = new Client();
         }
         return result;
@@ -94,8 +94,21 @@ public class ByteBufferTCPSampler extends AbstractJavaSamplerClient implements T
 
     private void makeDefaultResponse(SampleResult result) {
         rBuffer.flip();
-        long send = rBuffer.getLong();
-        long received = rBuffer.getLong();
+        while (rBuffer.remaining() >= 8) {
+            rBuffer.getLong();
+        }
+
+        while (rBuffer.remaining() >= 4) {
+            rBuffer.getInt();
+        }
+
+        while (rBuffer.remaining() >= 2) {
+            rBuffer.getShort();
+        }
+
+        while (rBuffer.remaining() >= 1) {
+            rBuffer.get();
+        }
         result.sampleEnd();
         result.setSuccessful(true);
         result.setResponseCodeOK();
@@ -104,15 +117,37 @@ public class ByteBufferTCPSampler extends AbstractJavaSamplerClient implements T
 
     private ByteBuffer getReadBuffer(JavaSamplerContext javaSamplerContext) {
         if(isSendDirect(javaSamplerContext)) {
-            return ByteBuffer.allocateDirect(getBufferSize(javaSamplerContext)).order(getByteOrder(javaSamplerContext));
+            return ByteBuffer.allocateDirect(getBufferSize(javaSamplerContext) + 5).order(getByteOrder(javaSamplerContext));
         }
-        return ByteBuffer.allocate(getBufferSize(javaSamplerContext)).order(getByteOrder(javaSamplerContext));
+        return ByteBuffer.allocate(getBufferSize(javaSamplerContext) + 5).order(getByteOrder(javaSamplerContext));
     }
 
-    private void putDefaultPacketOnBuffer() {
-        sampleBuffer.putShort((short)11);
+    private void putDefaultPacketOnBuffer(JavaSamplerContext javaSamplerContext) {
+        short packetSize = getBufferSize(javaSamplerContext);
+        sampleBuffer.putShort((short) (packetSize + 3));
         sampleBuffer.put((byte) 0x01);
-        sampleBuffer.putLong(System.currentTimeMillis());
+        sampleBuffer.putShort(packetSize);
+
+        while (packetSize >= 8) {
+            sampleBuffer.putLong(Long.MAX_VALUE);
+            packetSize -= 8;
+        }
+
+        while (packetSize >= 4) {
+            sampleBuffer.putInt(Integer.MAX_VALUE);
+            packetSize -= 4;
+        }
+
+        while (packetSize >= 2) {
+            sampleBuffer.putShort(Short.MAX_VALUE);
+            packetSize -= 2;
+        }
+
+        while (packetSize >= 1) {
+            sampleBuffer.put(Byte.MAX_VALUE);
+            packetSize--;
+        }
+
         sampleBuffer.flip();
     }
 
@@ -124,15 +159,16 @@ public class ByteBufferTCPSampler extends AbstractJavaSamplerClient implements T
         ByteOrder order = getByteOrder(javaSamplerContext);
 
         if (sendDirect) {
-            sampleBuffer = ByteBuffer.allocateDirect(bufferSize).order(order);
+            sampleBuffer = ByteBuffer.allocateDirect(bufferSize + 5).order(order);
         } else {
-            sampleBuffer = ByteBuffer.allocate(bufferSize).order(order);
+            sampleBuffer = ByteBuffer.allocate(bufferSize + 5).order(order);
         }
     }
 
 
-    private int getBufferSize(JavaSamplerContext javaSamplerContext) {
-        return javaSamplerContext.getIntParameter(BUFFER_SIZE);
+    private short getBufferSize(JavaSamplerContext javaSamplerContext) {
+        int bufferSize = javaSamplerContext.getIntParameter(BUFFER_SIZE);
+        return bufferSize > Short.MAX_VALUE ?  Short.MAX_VALUE  : (short) bufferSize;
     }
 
     private boolean isSendDirect(JavaSamplerContext javaSamplerContext) {
@@ -170,6 +206,5 @@ public class ByteBufferTCPSampler extends AbstractJavaSamplerClient implements T
 
     @Override
     public void threadFinished() {
-        client.close();
     }
 }
